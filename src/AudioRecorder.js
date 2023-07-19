@@ -1,60 +1,133 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, PermissionsAndroid } from 'react-native';
-import { AudioRecorderPlayer, AudioEncoderAndroid, AudioSourceAndroid } from 'react-native-audio-recorder-player';
-import { request, PERMISSIONS } from 'react-native-permissions';
+import { StatusBar, Platform, Alert } from 'expo-status-bar';
+import React from 'react';
+import { StyleSheet, Text, View, Button } from 'react-native';
+import { Audio } from 'expo-av';
 
-const AudioRecorder = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const audioRecorderPlayer = new AudioRecorderPlayer();
+export default function App() {
+  const [recording, setRecording] = React.useState(null);
+  const [recordings, setRecordings] = React.useState([]);
+  const [message, setMessage] = React.useState('');
 
-  const startRecording = async () => {
+  async function startRecording() {
     try {
-      await requestPermission();
-      const path = 'your_audio_file.mp3';
-      await audioRecorderPlayer.startRecorder(path, {
-        // You can set recording options here
-        // For example: sampleRate: 44100, channels: 1, bitsPerSample: 16
-        encoder: AudioEncoderAndroid.AAC,
-        AudioSource: AudioSourceAndroid.MIC,
-      });
-      setIsRecording(true);
-      console.log('Recording started');
-    } catch (err) {
-      console.error('Failed to start recording: ', err);
-    }
-  };
+      const { status } = await Audio.requestPermissionsAsync();
 
-  const stopRecording = async () => {
-    try {
-      const result = await audioRecorderPlayer.stopRecorder();
-      setIsRecording(false);
-      console.log('Recording stopped, audio file saved at: ', result);
-    } catch (err) {
-      console.error('Failed to stop recording: ', err);
-    }
-  };
+      if (status === 'granted') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
 
-  const requestPermission = async () => {
-    try {
-      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log('Record audio permission granted');
+        const recordingObject = new Audio.Recording();
+        await recordingObject.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+
+        setRecording(recordingObject);
+
+        await recordingObject.startAsync();
       } else {
-        console.log('Record audio permission denied');
+        setMessage('Please grant permission to access the microphone');
       }
-    } catch (err) {
-      console.error('Failed to request record audio permission: ', err);
+    } catch (error) {
+      console.error('Failed to start recording', error);
     }
-  };
+  }
+
+  async function stopRecording() {
+    try {
+      await recording.stopAndUnloadAsync();
+      const { sound, status } = await recording.createNewLoadedSoundAsync();
+
+      let updatedRecordings = [...recordings];
+      updatedRecordings.push({
+        sound: sound,
+        duration: getDurationFormatted(status.durationMillis),
+        file: recording.getURI(),
+      });
+
+      setRecordings(updatedRecordings);
+      setRecording(null);
+    } catch (error) {
+      console.error('Failed to stop recording', error);
+    }
+  }
+
+  function getDurationFormatted(millis) {
+    const minutes = Math.floor(millis / 60000);
+    const seconds = Math.floor((millis % 60000) / 1000);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  }
+
+  async function playSound(sound) {
+    try {
+      await sound.playAsync();
+    } catch (error) {
+      console.error('Failed to play sound', error);
+    }
+  }
+
+  async function deleteRecording(index) {
+    try {
+      const recordingLine = recordings[index];
+      await recordingLine.sound.unloadAsync();
+
+      let updatedRecordings = [...recordings];
+      updatedRecordings.splice(index, 1);
+      setRecordings(updatedRecordings);
+    } catch (error) {
+      console.error('Failed to delete recording', error);
+    }
+  }
+
+  function getRecordingLines() {
+    return recordings.map((recordingLine, index) => {
+      return (
+        <View key={index} style={styles.row}>
+          <Text style={styles.fill}>
+            Recording {index + 1} - {recordingLine.duration}
+          </Text>
+          <Button
+            onPress={() => playSound(recordingLine.sound)}
+            title="Play"
+          />
+          <Button
+            onPress={() => deleteRecording(index)}
+            title="Delete"
+          />
+        </View>
+      );
+    });
+  }
 
   return (
-    <View>
-      <Text>{isRecording ? 'Recording...' : 'Press button to start recording'}</Text>
-      <TouchableOpacity onPress={isRecording ? stopRecording : startRecording}>
-        <Text>{isRecording ? 'Stop Recording' : 'Start Recording'}</Text>
-      </TouchableOpacity>
+    <View style={styles.container}>
+      <Text>{message}</Text>
+      <Button
+        title={recording ? 'Stop Recording' : 'Start Recording'}
+        onPress={recording ? stopRecording : startRecording}
+      />
+      {getRecordingLines()}
+      <StatusBar style="auto" />
     </View>
   );
-};
+}
 
-export default AudioRecorder;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fill: {
+    flex: 1,
+    margin: 16,
+  },
+  button: {
+    margin: 16,
+  },
+});

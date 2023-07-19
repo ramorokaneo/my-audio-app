@@ -12,6 +12,12 @@ const Home = (props) => {
         <Text style={{ color: 'white', fontSize: 64, marginBottom: 40}}>Sound</Text>
         <Btn bgColor={Arctic} textColor='white' btnLabel="Login" Press={() => props.navigation.navigate("Login")} />
         <Btn bgColor='white' textColor={Sky} btnLabel="Signup" Press={() => props.navigation.navigate("Signup")} />
+        <Btn
+        bgColor={Arctic}
+        textColor='white'
+        btnLabel="Go to Audio Recorder"
+        Press={() => props.navigation.navigate("AudioRecorder")}
+      />
       </View>
     </Background>
   )
