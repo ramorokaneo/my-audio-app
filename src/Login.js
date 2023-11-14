@@ -1,4 +1,3 @@
-// Import statements
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -28,6 +27,7 @@ const Login = (props) => {
         const jsonValue = await AsyncStorage.getItem('userDetails');
         const userDetails = jsonValue != null ? JSON.parse(jsonValue) : null;
         setStoredUserDetails(userDetails);
+        console.log('Fetched User Details:', userDetails);
       } catch (error) {
         console.error('Error fetching user details:', error);
       }
@@ -37,14 +37,28 @@ const Login = (props) => {
   }, []);
 
   const handleLogin = () => {
-    if (!credentials.email || !credentials.password) {
-      setError('Please enter both email and password');
-    } else if (storedUserDetails && credentials.email === storedUserDetails.email && credentials.password === storedUserDetails.password) {
-      setError('');
-      Alert.alert('Logged In', 'You have successfully logged in.');
-      props.navigation.navigate('AudioRecorder');
-    } else {
-      setError('Invalid email or password');
+    try {
+      console.log('Credentials:', credentials);
+      console.log('Stored User Details:', storedUserDetails);
+
+      if (!credentials.email || !credentials.password) {
+        setError('Please enter both email and password');
+      } else if (storedUserDetails) {
+        console.log('Stored Email:', storedUserDetails.email);
+        console.log('Stored Password:', storedUserDetails.password);
+
+        if (credentials.email === storedUserDetails.email && credentials.password === storedUserDetails.password) {
+          setError('');
+          Alert.alert('Logged In', 'You have successfully logged in.');
+          props.navigation.navigate('AudioRecorder');
+        } else {
+          setError('Invalid email or password');
+        }
+      } else {
+        setError('No stored user details found');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
     }
   };
 
@@ -127,7 +141,7 @@ const styles = StyleSheet.create({
     paddingTop: verticalScale(60),
     alignItems: 'center',
     paddingVertical: verticalScale(30),
-    marginTop: -verticalScale(20),
+    marginTop: -verticalScale(10),
   },
   welcomeText: {
     fontSize: moderateScale(30),

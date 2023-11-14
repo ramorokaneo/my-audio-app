@@ -29,6 +29,7 @@ const Signup = (props) => {
     try {
       const jsonValue = JSON.stringify(userDetails);
       await AsyncStorage.setItem('userDetails', jsonValue);
+      console.log('User details saved:', jsonValue);
     } catch (error) {
       console.error('Error saving user information:', error);
     }

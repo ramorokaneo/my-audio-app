@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, Button, ImageBackground, FlatList, TouchableOpacity, Platform } from 'react-native';
+import { Text, View, StyleSheet, Button, ImageBackground, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import { Ionicons, FontAwesome } from '@expo/vector-icons';
 
-export default function AudioRecorder() {
+export default function AudioRecorder({ navigation }) {
   const [recording, setRecording] = useState(null);
   const [recordingsList, setRecordingsList] = useState([]);
   const [sound, setSound] = useState(null);
@@ -34,7 +35,6 @@ export default function AudioRecorder() {
 
       console.log('Starting recording..');
 
-      // Configure recording options based on the platform
       const recordingOptions = {
         android: {
           extension: '.m4a',
@@ -76,13 +76,19 @@ export default function AudioRecorder() {
 
       setRecording(null);
       await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      console.log('Recording stopped and stored at', uri);
 
-      // Save the recorded audio file with date and time to the list
+      const status = await recording.getStatusAsync();
+      const duration = Math.floor(status.durationMillis / 1000);
+
       const currentDate = new Date();
-      const recordingData = { uri, date: currentDate.toLocaleDateString(), time: currentDate.toLocaleTimeString() };
+      const recordingData = {
+        uri: recording.getURI(),
+        date: currentDate.toLocaleDateString(),
+        time: currentDate.toLocaleTimeString(),
+        duration,
+      };
       setRecordingsList((prevList) => [...prevList, recordingData]);
+      console.log('Recording stopped and stored at', recordingData.uri);
     } catch (err) {
       console.error('Failed to stop recording:', err.message);
     }
@@ -123,17 +129,57 @@ export default function AudioRecorder() {
   };
 
   const renderRecordingItem = ({ item }) => (
-    <View style={styles.recordingItem}>
+    <View style={styles.card}>
       <Text style={styles.recordingText}>Recording {item.index + 1}</Text>
+      <Text style={styles.recordingDetails}>
+        {`Date: ${item.date}\nTime: ${item.time}\nDuration: ${formatDuration(item.duration)}`}
+      </Text>
       <View style={styles.buttonsContainer}>
-        <Button title="Play" onPress={() => playSound(item)} />
-        <Button title="Delete" onPress={() => deleteRecording(item)} />
+        <TouchableOpacity style={styles.iconContainer} onPress={() => playSound(item)}>
+          <Ionicons name="ios-play-circle" size={24} color="#2ecc71" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconContainer} onPress={() => deleteRecording(item)}>
+          <Ionicons name="ios-trash" size={24} color="#e74c3c" />
+        </TouchableOpacity>
       </View>
     </View>
   );
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          onPress: () => {
+            // You can add your logout logic here
+            navigation.navigate('Login'); // Assuming you have a 'Login' screen
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
+  const formatDuration = (duration) => {
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
   return (
     <ImageBackground source={require('./assets/beach.jpg')} style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Audio Recorder</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <FontAwesome name="sign-out" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.recordingsListContainer}>
         <FlatList
           data={recordingsList.map((item, index) => ({ ...item, index }))}
@@ -144,12 +190,18 @@ export default function AudioRecorder() {
       </View>
       <View style={styles.controlsContainer}>
         {recording ? (
-          <Button title="Stop Recording" onPress={stopRecording} />
+          <TouchableOpacity style={styles.recordButton} onPress={stopRecording}>
+            <Ionicons name="ios-stop-circle" size={60} color="#e74c3c" />
+          </TouchableOpacity>
         ) : (
-          <Button title="Start Recording" onPress={startRecording} />
+          <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
+            <Ionicons name="ios-microphone" size={60} color="#3498db" />
+          </TouchableOpacity>
         )}
         {sound && (
-          <Button title="Stop Playback" onPress={stopSound} />
+          <TouchableOpacity style={styles.stopButton} onPress={stopSound}>
+            <Ionicons name="ios-square" size={60} color="#e74c3c" />
+          </TouchableOpacity>
         )}
       </View>
     </ImageBackground>
@@ -159,25 +211,45 @@ export default function AudioRecorder() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    padding: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  headerText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  logoutButton: {
     padding: 10,
   },
   recordingsListContainer: {
     flex: 1,
   },
-  recordingItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
   },
   recordingText: {
     fontSize: 16,
   },
+  recordingDetails: {
+    fontSize: 14,
+    marginTop: 5,
+    color: '#333', // Adjust the color as needed
+  },
   buttonsContainer: {
     flexDirection: 'row',
+    marginTop: 10,
+  },
+  iconContainer: {
+    marginHorizontal: 10,
   },
   emptyText: {
     fontSize: 16,
@@ -185,6 +257,23 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   controlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  recordButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#3498db',
+    borderRadius: 50,
+    padding: 15,
+  },
+  stopButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#e74c3c',
+    borderRadius: 50,
+    padding: 15,
   },
 });
