@@ -3,6 +3,7 @@ import { Text, View, StyleSheet, Button, ImageBackground, FlatList, TouchableOpa
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AudioRecorder({ navigation }) {
   const [recording, setRecording] = useState(null);
@@ -10,6 +11,7 @@ export default function AudioRecorder({ navigation }) {
   const [sound, setSound] = useState(null);
 
   useEffect(() => {
+    loadRecordings();
     return () => {
       // Unload the sound when the component unmounts to avoid memory leaks
       if (sound) {
@@ -17,6 +19,27 @@ export default function AudioRecorder({ navigation }) {
       }
     };
   }, []);
+
+  // Load recorded audio list from AsyncStorage
+  const loadRecordings = async () => {
+    try {
+      const storedRecordings = await AsyncStorage.getItem('recordings');
+      if (storedRecordings) {
+        setRecordingsList(JSON.parse(storedRecordings));
+      }
+    } catch (error) {
+      console.error('Failed to load recordings:', error);
+    }
+  };
+
+  // Save recorded audio list to AsyncStorage
+  const saveRecordings = async (recordings) => {
+    try {
+      await AsyncStorage.setItem('recordings', JSON.stringify(recordings));
+    } catch (error) {
+      console.error('Failed to save recordings:', error);
+    }
+  };
 
   async function startRecording() {
     try {
@@ -87,7 +110,9 @@ export default function AudioRecorder({ navigation }) {
         time: currentDate.toLocaleTimeString(),
         duration,
       };
-      setRecordingsList((prevList) => [...prevList, recordingData]);
+      const updatedRecordingsList = [...recordingsList, recordingData];
+      setRecordingsList(updatedRecordingsList);
+      await saveRecordings(updatedRecordingsList);
       console.log('Recording stopped and stored at', recordingData.uri);
     } catch (err) {
       console.error('Failed to stop recording:', err.message);
@@ -97,7 +122,9 @@ export default function AudioRecorder({ navigation }) {
   async function deleteRecording(item) {
     try {
       await FileSystem.deleteAsync(item.uri);
-      setRecordingsList((prevList) => prevList.filter((rec) => rec.uri !== item.uri));
+      const updatedRecordingsList = recordingsList.filter((rec) => rec.uri !== item.uri);
+      setRecordingsList(updatedRecordingsList);
+      await saveRecordings(updatedRecordingsList);
       console.log('Recording deleted:', item.uri);
     } catch (error) {
       console.error('Failed to delete recording:', error);
